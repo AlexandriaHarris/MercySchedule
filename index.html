@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENT Schedule Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .secondary-btn {
+            background-color: #2196F3;
+        }
+        .secondary-btn:hover {
+            background-color: #0b7dda;
+        }
+        .clear-btn {
+            background-color: #f44336;
+        }
+        .clear-btn:hover {
+            background-color: #da190b;
+        }
+        .info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        .preview {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 11px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #f44336;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .warning {
+            background-color: #fff3e0;
+            color: #e65100;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ENT Schedule Generator</h1>
+        <p class="subtitle">Automatically parse appointment data and generate formatted Excel schedules</p>
+        
+        <div class="info">
+            <h3>Instructions:</h3>
+            <ol>
+                <li><strong>Paste Raw Schedule Data:</strong> Copy appointment listings from your documents</li>
+                <li><strong>Configure Team Info:</strong> Set week dates, residents, medical student, and rotation assignments</li>
+                <li><strong>Parse Data:</strong> Click "Parse Schedule Data" to analyze appointments</li>
+                <li><strong>Review & Generate:</strong> Check the preview and click "Generate Excel"</li>
+            </ol>
+        </div>
+
+        <div id="messageArea"></div>
+
+        <div class="section">
+            <h3>1. Raw Schedule Data</h3>
+            <textarea id="scheduleInput" placeholder="Paste raw schedule data here...
+
+Example format:
+10/20:
+Smith, Libby J, DO    7:15 AM    000123971    Scheduled    SURGERY    ENTMERCYOR
+Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
+..."></textarea>
+        </div>
+
+        <div class="section">
+            <h3>2. Team Configuration</h3>
+            
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="weekStart">Week Start Date (MM/DD/YYYY):</label>
+                    <input type="text" id="weekStart" placeholder="10/20/2025">
+                </div>
+                <div class="input-group">
+                    <label for="weekNumber">Block & Week (e.g., Block 3, Week 2):</label>
+                    <input type="text" id="weekNumber" placeholder="Block 3, Week 2">
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="ent4Name">ENT 4 Name:</label>
+                    <input type="text" id="ent4Name" placeholder="Alex">
+                </div>
+                <div class="input-group">
+                    <label for="ent4Service">ENT 4 Service:</label>
+                    <select id="ent4Service">
+                        <option value="Sleep">Sleep</option>
+                        <option value="Laryngology">Laryngology</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="ent3Name">ENT 3 Name:</label>
+                    <input type="text" id="ent3Name" placeholder="Frankie">
+                </div>
+                <div class="input-group">
+                    <label for="ent3Service">ENT 3 Service:</label>
+                    <select id="ent3Service">
+                        <option value="Laryngology">Laryngology</option>
+                        <option value="Sleep">Sleep</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="medStudent">Medical Student Name:</label>
+                    <input type="text" id="medStudent" placeholder="Yu">
+                </div>
+                <div class="input-group">
+                    <label for="specialNotes">Special Notes (OOT, etc.):</label>
+                    <input type="text" id="specialNotes" placeholder="Frankie OOT Monday">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>3. Parse & Generate</h3>
+            <button onclick="parseSchedule()">Parse Schedule Data</button>
+            <button class="secondary-btn" onclick="showPreview()">Preview Table</button>
+            <button onclick="generateExcel()">Generate Excel File</button>
+            <button class="clear-btn" onclick="clearAll()">Clear All</button>
+        </div>
+
+        <div id="preview" class="preview"></div>
+    </div>
+
+    <script>
+        let parsedData = null;
+
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function parseSchedule() {
+            try {
+                const input = document.getElementById('scheduleInput').value;
+                if (!input.trim()) {
+                    throw new Error('Please paste schedule data first');
+                }
+
+                const lines = input.split('\n');
+                const appointments = [];
+                let currentDate = '';
+
+                // Parse each line
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line) continue;
+
+                    // Check if it's a date line (e.g., "10/20:")
+                    const dateMatch = line.match(/^(\d{1,2}\/\d{1,2}):/);
+                    if (dateMatch) {
+                        currentDate = dateMatch[1];
+                        continue;
+                    }
+
+                    // Parse appointment line
+                    // Format: Provider    Time    Patient    Status    Type    Department
+                    const parts = line.split(/\t+/);
+                    if (parts.length < 6) continue;
+
+                    const provider = parts[0].trim();
+                    const type = parts[4].trim();
+                    const department = parts[5].trim();
+
+                    appointments.push({
+                        date: currentDate,
+                        provider: provider,
+                        type: type,
+                        department: department
+                    });
+                }
+
+                // Organize data by provider and date
+                parsedData = organizeData(appointments);
+                
+                showMessage(`Successfully parsed ${appointments.length} appointments!`, 'success');
+                console.log('Parsed data:', parsedData);
+            } catch (error) {
+                showMessage(`Error parsing schedule: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function organizeData(appointments) {
+            const data = {};
+            const attendings = ['Smith', 'Stinnett', 'Santa Maria', 'Soose', 'Whelan', 'Kaffenberger'];
+            const apps = ['Copeland', 'Yon', 'Sommers'];
+
+            // Get unique dates and sort them
+            const dates = [...new Set(appointments.map(a => a.date))].sort((a, b) => {
+                const [m1, d1] = a.split('/').map(Number);
+                const [m2, d2] = b.split('/').map(Number);
+                return m1 === m2 ? d1 - d2 : m1 - m2;
+            });
+
+            // Initialize structure
+            for (let attending of attendings) {
+                data[attending] = {};
+                for (let date of dates) {
+                    data[attending][date] = { orCases: 0, clinicPts: 0, location: '', clinicType: '' };
+                }
+            }
+
+            // Initialize APP structure
+            data['APPs'] = {};
+            for (let date of dates) {
+                data['APPs'][date] = { emily: 0, jared: 0, nichole: 0 };
+            }
+
+            // Count appointments
+            for (let apt of appointments) {
+                // Find which attending this is for
+                let attendingName = null;
+                for (let att of attendings) {
+                    if (apt.provider.includes(att)) {
+                        attendingName = att;
+                        break;
+                    }
+                }
+
+                // Check if it's an APP
+                let appName = null;
+                if (apt.provider.includes('Copeland')) appName = 'emily';
+                else if (apt.provider.includes('Yon')) appName = 'jared';
+                else if (apt.provider.includes('Sommers')) appName = 'nichole';
+
+                if (attendingName && data[attendingName][apt.date]) {
+                    const dayData = data[attendingName][apt.date];
+                    
+                    if (apt.type === 'SURGERY') {
+                        dayData.orCases++;
+                    } else {
+                        dayData.clinicPts++;
+                    }
+
+                    // Determine location and clinic type
+                    if (apt.department.includes('MONGEN')) {
+                        dayData.location = 'Monroeville';
+                    } else if (apt.department.includes('SHYOR')) {
+                        dayData.location = 'Shadyside';
+                    } else if (apt.department.includes('entcin') || apt.department.includes('enchwx')) {
+                        dayData.location = apt.department;
+                    }
+
+                    if (apt.department.includes('SWAL')) {
+                        dayData.clinicType = 'Swallow';
+                    } else if (apt.department.includes('voic')) {
+                        dayData.clinicType = 'Voice';
+                    } else if (apt.department.includes('SLEEP')) {
+                        dayData.clinicType = 'Sleep';
+                    }
+                } else if (appName && data['APPs'][apt.date]) {
+                    if (apt.type !== 'SURGERY') {
+                        data['APPs'][apt.date][appName]++;
+                    }
+                }
+            }
+
+            data.dates = dates;
+            return data;
+        }
+
+        function assignCoverage(attending, date, dayData) {
+            const ent4Name = document.getElementById('ent4Name').value || 'Alex';
+            const ent3Name = document.getElementById('ent3Name').value || 'Frankie';
+            const ent4Service = document.getElementById('ent4Service').value;
+            const ent3Service = document.getElementById('ent3Service').value;
+            const medStudent = document.getElementById('medStudent').value || 'Yu';
+            const specialNotes = document.getElementById('specialNotes').value.toLowerCase();
+
+            // Determine service
+            let service = '';
+            if (['Smith', 'Stinnett', 'Santa Maria'].includes(attending)) {
+                service = 'Laryngology';
+            } else if (['Soose', 'Kaffenberger', 'Whelan'].includes(attending)) {
+                service = 'Sleep';
+            }
+
+            // Don't assign to non-Mercy locations
+            if (dayData.location && dayData.location !== '') {
+                return '';
+            }
+
+            // Assign resident based on service and availability
+            let resident = '';
+            if (service === ent4Service) {
+                resident = ent4Name;
+            } else if (service === ent3Service) {
+                resident = ent3Name;
+            }
+
+            // Prioritize OR coverage
+            if (dayData.orCases > 0) {
+                return resident;
+            }
+
+            // For clinics, assign if on their service
+            if (dayData.clinicPts > 0 && resident) {
+                return resident;
+            }
+
+            return '';
+        }
+
+        function assignMedStudent(attending, dateIndex) {
+            const medStudent = document.getElementById('medStudent').value || 'Yu';
+            
+            // Standard med student schedule:
+            // Mon: Smith OR, Tue: Smith clinic, Wed: Stinnett/Santa Maria
+            // Thu: Kaffenberger, Fri: Soose OR
+            
+            const dayOfWeek = dateIndex % 5; // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri
+            
+            if (dayOfWeek === 0 && attending === 'Smith') return medStudent; // Mon OR
+            if (dayOfWeek === 1 && attending === 'Smith') return medStudent; // Tue clinic
+            if (dayOfWeek === 2 && (attending === 'Stinnett' || attending === 'Santa Maria')) return medStudent; // Wed
+            if (dayOfWeek === 3 && attending === 'Kaffenberger') return medStudent; // Thu
+            if (dayOfWeek === 4 && attending === 'Soose') return medStudent; // Fri OR
+            
+            return '';
+        }
+
+        function generateScheduleTable() {
+            if (!parsedData) {
+                throw new Error('Please parse schedule data first');
+            }
+
+            const attendings = ['Smith', 'Stinnett', 'Santa Maria', 'Soose', 'Whelan', 'Kaffenberger'];
+            const dates = parsedData.dates;
+            const tableData = [];
+
+            // Generate rows for each attending
+            for (let attending of attendings) {
+                const row1 = [attending];
+                const row2 = [''];
+
+                for (let i = 0; i < dates.length; i++) {
+                    const date = dates[i];
+                    const dayData = parsedData[attending][date];
+                    
+                    let activity = '';
+                    let count = '';
+                    let resident = '';
+                    let student = '';
+
+                    if (dayData.orCases > 0) {
+                        activity = 'OR';
+                        if (dayData.location) activity += ` (${dayData.location})`;
+                        count = `${dayData.orCases} cases`;
+                        resident = assignCoverage(attending, date, dayData);
+                        if (dayData.orCases > 0) student = assignMedStudent(attending, i);
+                    } else if (dayData.clinicPts > 0) {
+                        activity = 'CLINIC';
+                        if (dayData.clinicType) activity += ` (${dayData.clinicType})`;
+                        if (dayData.location) activity += ` (${dayData.location})`;
+                        count = `${dayData.clinicPts} pts`;
+                        resident = assignCoverage(attending, date, dayData);
+                        if (dayData.clinicPts > 0) student = assignMedStudent(attending, i);
+                    }
+
+                    row1.push(activity, resident);
+                    row2.push(count, student);
+                }
+
+                tableData.push(row1);
+                tableData.push(row2);
+            }
+
+            // Add APP row
+            const appRow1 = ['EMILY/JARED/NICHOLE'];
+            const appRow2 = [''];
+            for (let date of dates) {
+                const appData = parsedData['APPs'][date];
+                const hasClinic = appData.emily > 0 || appData.jared > 0 || appData.nichole > 0;
+                appRow1.push(hasClinic ? 'CLINIC' : '', '');
+                appRow2.push(hasClinic ? `${appData.emily}/${appData.jared}/${appData.nichole} pts` : '', '');
+            }
+            tableData.push(appRow1);
+
+            // Add pager, OOT, meetings rows
+            const ent4Name = document.getElementById('ent4Name').value || 'Alex';
+            const ent3Name = document.getElementById('ent3Name').value || 'Frankie';
+            
+            const pagerRow = ['PAGER'];
+            const ootRow = ['OOT'];
+            const meetingsRow = ['MEETINGS'];
+            
+            for (let i = 0; i < dates.length; i++) {
+                pagerRow.push(i === 0 ? ent4Name : ent3Name, '');
+                ootRow.push('', '');
+                meetingsRow.push(i === 1 ? 'ENT GR 7-8 Didactics 8-11' : '', '');
+            }
+            
+            tableData.push(pagerRow);
+            tableData.push(ootRow);
+            tableData.push(meetingsRow);
+
+            return tableData;
+        }
+
+        function showPreview() {
+            try {
+                const tableData = generateScheduleTable();
+                const dates = parsedData.dates;
+                
+                let html = '<table>';
+                
+                // Header row
+                html += '<tr><th>Attending</th>';
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                for (let i = 0; i < dates.length; i++) {
+                    html += `<th colspan="2">${days[i]} (${dates[i]})</th>`;
+                }
+                html += '</tr>';
+
+                // Subheader
+                html += '<tr><th></th>';
+                for (let i = 0; i < dates.length; i++) {
+                    html += '<th>Activity</th><th>Assigned</th>';
+                }
+                html += '</tr>';
+                
+                // Data rows
+                tableData.forEach(row => {
+                    html += '<tr>';
+                    row.forEach(cell => {
+                        html += `<td>${cell || '&nbsp;'}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</table>';
+                
+                document.getElementById('preview').innerHTML = html;
+                showMessage('Preview generated successfully!', 'success');
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+                document.getElementById('preview').innerHTML = '';
+            }
+        }
+
+        function generateExcel() {
+            try {
+                const tableData = generateScheduleTable();
+                const dates = parsedData.dates;
+                
+                // Create header row
+                const headerRow = ['Attending'];
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                for (let i = 0; i < dates.length; i++) {
+                    headerRow.push(`${days[i]} Activity`, `${days[i]} Assigned`);
+                }
+                
+                const excelData = [headerRow, ...tableData];
+
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+                // Set column widths
+                const colWidths = [{ wch: 20 }];
+                for (let i = 0; i < dates.length; i++) {
+                    colWidths.push({ wch: 18 }, { wch: 12 });
+                }
+                ws['!cols'] = colWidths;
+
+                XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+
+                // Generate filename
+                const weekInfo = document.getElementById('weekNumber').value || 'Schedule';
+                const filename = `ENT_${weekInfo.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+
+                XLSX.writeFile(wb, filename);
+                
+                showMessage(`Excel file "${filename}" generated successfully!`, 'success');
+            } catch (error) {
+                showMessage(`Error generating Excel: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('scheduleInput').value = '';
+            document.getElementById('preview').innerHTML = '';
+            document.getElementById('messageArea').innerHTML = '';
+            parsedData = null;
+        }
+    </script>
+</body>
+</html>
