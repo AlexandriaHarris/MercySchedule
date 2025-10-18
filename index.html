@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENT Schedule Generator</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -79,9 +78,13 @@
             font-size: 14px;
             font-weight: bold;
             margin-right: 10px;
+            margin-bottom: 10px;
         }
         button:hover {
             background-color: #45a049;
+        }
+        button:active {
+            transform: scale(0.98);
         }
         .secondary-btn {
             background-color: #2196F3;
@@ -117,12 +120,18 @@
             text-align: left;
         }
         th {
-            background-color: #4CAF50;
-            color: white;
+            background-color: #fff9c4;
+            color: #333;
             font-weight: bold;
         }
         tr:nth-child(even) {
             background-color: #f9f9f9;
+        }
+        .clinic-cell {
+            background-color: #c8e6c9;
+        }
+        .or-cell {
+            background-color: #ffcdd2;
         }
         .error {
             background-color: #ffebee;
@@ -140,13 +149,13 @@
             margin: 10px 0;
             border-left: 4px solid #4CAF50;
         }
-        .warning {
-            background-color: #fff3e0;
-            color: #e65100;
-            padding: 15px;
+        .debug {
+            background-color: #f5f5f5;
+            padding: 10px;
             border-radius: 4px;
             margin: 10px 0;
-            border-left: 4px solid #ff9800;
+            font-family: monospace;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -163,6 +172,7 @@
                 <li><strong>Parse Data:</strong> Click "Parse Schedule Data" to analyze appointments</li>
                 <li><strong>Review & Generate:</strong> Check the preview and click "Generate Excel"</li>
             </ol>
+            <p><strong>Color coding:</strong> Headers in pastel yellow, CLINIC in green, OR in red</p>
         </div>
 
         <div id="messageArea"></div>
@@ -173,8 +183,8 @@
 
 Example format:
 10/20:
-Smith, Libby J, DO    7:15 AM    000123971    Scheduled    SURGERY    ENTMERCYOR
-Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
+Smith, Libby J, DO	7:15 AM	000123971	Scheduled	SURGERY	ENTMERCYOR
+Soose, Ryan J, MD	8:00 AM	841878807	Scheduled	ENT NEW	ENTMERSLEEP
 ..."></textarea>
         </div>
 
@@ -184,18 +194,18 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             <div class="input-row">
                 <div class="input-group">
                     <label for="weekStart">Week Start Date (MM/DD/YYYY):</label>
-                    <input type="text" id="weekStart" placeholder="10/20/2025">
+                    <input type="text" id="weekStart" placeholder="10/20/2025" value="10/20/2025">
                 </div>
                 <div class="input-group">
                     <label for="weekNumber">Block & Week (e.g., Block 3, Week 2):</label>
-                    <input type="text" id="weekNumber" placeholder="Block 3, Week 2">
+                    <input type="text" id="weekNumber" placeholder="Block 3, Week 2" value="Block 3, Week 2">
                 </div>
             </div>
 
             <div class="input-row">
                 <div class="input-group">
                     <label for="ent4Name">ENT 4 Name:</label>
-                    <input type="text" id="ent4Name" placeholder="Alex">
+                    <input type="text" id="ent4Name" placeholder="Alex" value="Alex">
                 </div>
                 <div class="input-group">
                     <label for="ent4Service">ENT 4 Service:</label>
@@ -209,7 +219,7 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             <div class="input-row">
                 <div class="input-group">
                     <label for="ent3Name">ENT 3 Name:</label>
-                    <input type="text" id="ent3Name" placeholder="Frankie">
+                    <input type="text" id="ent3Name" placeholder="Frankie" value="Frankie">
                 </div>
                 <div class="input-group">
                     <label for="ent3Service">ENT 3 Service:</label>
@@ -223,7 +233,7 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             <div class="input-row">
                 <div class="input-group">
                     <label for="medStudent">Medical Student Name:</label>
-                    <input type="text" id="medStudent" placeholder="Yu">
+                    <input type="text" id="medStudent" placeholder="Yu" value="Yu">
                 </div>
                 <div class="input-group">
                     <label for="specialNotes">Special Notes (OOT, etc.):</label>
@@ -234,24 +244,29 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
 
         <div class="section">
             <h3>3. Parse & Generate</h3>
-            <button onclick="parseSchedule()">Parse Schedule Data</button>
-            <button class="secondary-btn" onclick="showPreview()">Preview Table</button>
-            <button onclick="generateExcel()">Generate Excel File</button>
-            <button class="clear-btn" onclick="clearAll()">Clear All</button>
+            <button id="parseBtn">Parse Schedule Data</button>
+            <button id="previewBtn" class="secondary-btn">Preview Table</button>
+            <button id="excelBtn">Generate Excel File</button>
+            <button id="clearBtn" class="clear-btn">Clear All</button>
         </div>
 
         <div id="preview" class="preview"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
+        console.log('Script loaded');
+        
         let parsedData = null;
 
         function showMessage(message, type) {
             const messageArea = document.getElementById('messageArea');
             messageArea.innerHTML = `<div class="${type}">${message}</div>`;
+            console.log(`[${type}] ${message}`);
         }
 
-        function parseSchedule() {
+        function parseScheduleData() {
+            console.log('parseScheduleData called');
             try {
                 const input = document.getElementById('scheduleInput').value;
                 if (!input.trim()) {
@@ -262,6 +277,8 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 const appointments = [];
                 let currentDate = '';
 
+                console.log(`Processing ${lines.length} lines`);
+
                 // Parse each line
                 for (let line of lines) {
                     line = line.trim();
@@ -271,12 +288,12 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                     const dateMatch = line.match(/^(\d{1,2}\/\d{1,2}):/);
                     if (dateMatch) {
                         currentDate = dateMatch[1];
+                        console.log(`Found date: ${currentDate}`);
                         continue;
                     }
 
-                    // Parse appointment line
-                    // Format: Provider    Time    Patient    Status    Type    Department
-                    const parts = line.split(/\t+/);
+                    // Parse appointment line - split by tabs
+                    const parts = line.split('\t').filter(p => p.trim());
                     if (parts.length < 6) continue;
 
                     const provider = parts[0].trim();
@@ -291,21 +308,38 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                     });
                 }
 
+                console.log(`Parsed ${appointments.length} appointments`);
+
                 // Organize data by provider and date
                 parsedData = organizeData(appointments);
                 
-                showMessage(`Successfully parsed ${appointments.length} appointments!`, 'success');
-                console.log('Parsed data:', parsedData);
+                showMessage(`Successfully parsed ${appointments.length} appointments across ${parsedData.dates.length} days!`, 'success');
+                
+                // Show summary
+                let summary = '<div class="debug">Summary:<br>';
+                summary += `Dates found: ${parsedData.dates.join(', ')}<br>`;
+                for (let att of ['Smith', 'Stinnett', 'Santa Maria', 'Soose', 'Whelan', 'Kaffenberger']) {
+                    summary += `${att}: `;
+                    for (let date of parsedData.dates) {
+                        const data = parsedData[att][date];
+                        if (data.orCases > 0 || data.clinicPts > 0) {
+                            summary += `${date}(OR:${data.orCases}, Clinic:${data.clinicPts}) `;
+                        }
+                    }
+                    summary += '<br>';
+                }
+                summary += '</div>';
+                document.getElementById('messageArea').innerHTML += summary;
+                
             } catch (error) {
                 showMessage(`Error parsing schedule: ${error.message}`, 'error');
-                console.error(error);
+                console.error('Parse error:', error);
             }
         }
 
         function organizeData(appointments) {
             const data = {};
             const attendings = ['Smith', 'Stinnett', 'Santa Maria', 'Soose', 'Whelan', 'Kaffenberger'];
-            const apps = ['Copeland', 'Yon', 'Sommers'];
 
             // Get unique dates and sort them
             const dates = [...new Set(appointments.map(a => a.date))].sort((a, b) => {
@@ -314,7 +348,9 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 return m1 === m2 ? d1 - d2 : m1 - m2;
             });
 
-            // Initialize structure
+            console.log('Dates found:', dates);
+
+            // Initialize structure - make sure we have exactly 5 days
             for (let attending of attendings) {
                 data[attending] = {};
                 for (let date of dates) {
@@ -333,7 +369,7 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 // Find which attending this is for
                 let attendingName = null;
                 for (let att of attendings) {
-                    if (apt.provider.includes(att)) {
+                    if (apt.provider.toUpperCase().includes(att.toUpperCase().replace(' ', ''))) {
                         attendingName = att;
                         break;
                     }
@@ -341,9 +377,9 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
 
                 // Check if it's an APP
                 let appName = null;
-                if (apt.provider.includes('Copeland')) appName = 'emily';
-                else if (apt.provider.includes('Yon')) appName = 'jared';
-                else if (apt.provider.includes('Sommers')) appName = 'nichole';
+                if (apt.provider.includes('Copeland') || apt.provider.includes('Emily')) appName = 'emily';
+                else if (apt.provider.includes('Yon') || apt.provider.includes('Jared')) appName = 'jared';
+                else if (apt.provider.includes('Sommers') || apt.provider.includes('Nichole')) appName = 'nichole';
 
                 if (attendingName && data[attendingName][apt.date]) {
                     const dayData = data[attendingName][apt.date];
@@ -355,19 +391,19 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                     }
 
                     // Determine location and clinic type
-                    if (apt.department.includes('MONGEN')) {
+                    if (apt.department.includes('MONGEN') || apt.department.includes('Monroeville')) {
                         dayData.location = 'Monroeville';
-                    } else if (apt.department.includes('SHYOR')) {
+                    } else if (apt.department.includes('SHYOR') || apt.department.includes('Shadyside')) {
                         dayData.location = 'Shadyside';
                     } else if (apt.department.includes('entcin') || apt.department.includes('enchwx')) {
-                        dayData.location = apt.department;
+                        dayData.location = apt.department.includes('entcin') ? 'entcin' : 'enchwx';
                     }
 
-                    if (apt.department.includes('SWAL')) {
+                    if (apt.department.toUpperCase().includes('SWAL')) {
                         dayData.clinicType = 'Swallow';
-                    } else if (apt.department.includes('voic')) {
+                    } else if (apt.department.toLowerCase().includes('voic')) {
                         dayData.clinicType = 'Voice';
-                    } else if (apt.department.includes('SLEEP')) {
+                    } else if (apt.department.toUpperCase().includes('SLEEP')) {
                         dayData.clinicType = 'Sleep';
                     }
                 } else if (appName && data['APPs'][apt.date]) {
@@ -378,16 +414,15 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             }
 
             data.dates = dates;
+            console.log('Final data structure:', data);
             return data;
         }
 
-        function assignCoverage(attending, date, dayData) {
+        function assignCoverage(attending, date, dayData, dateIndex) {
             const ent4Name = document.getElementById('ent4Name').value || 'Alex';
             const ent3Name = document.getElementById('ent3Name').value || 'Frankie';
             const ent4Service = document.getElementById('ent4Service').value;
             const ent3Service = document.getElementById('ent3Service').value;
-            const medStudent = document.getElementById('medStudent').value || 'Yu';
-            const specialNotes = document.getElementById('specialNotes').value.toLowerCase();
 
             // Determine service
             let service = '';
@@ -402,7 +437,7 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 return '';
             }
 
-            // Assign resident based on service and availability
+            // Assign resident based on service
             let resident = '';
             if (service === ent4Service) {
                 resident = ent4Name;
@@ -410,33 +445,24 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 resident = ent3Name;
             }
 
-            // Prioritize OR coverage
-            if (dayData.orCases > 0) {
-                return resident;
-            }
-
-            // For clinics, assign if on their service
-            if (dayData.clinicPts > 0 && resident) {
-                return resident;
-            }
-
-            return '';
+            return resident;
         }
 
         function assignMedStudent(attending, dateIndex) {
-            const medStudent = document.getElementById('medStudent').value || 'Yu';
+            const medStudent = document.getElementById('medStudent').value || '';
+            if (!medStudent) return '';
             
             // Standard med student schedule:
             // Mon: Smith OR, Tue: Smith clinic, Wed: Stinnett/Santa Maria
             // Thu: Kaffenberger, Fri: Soose OR
             
-            const dayOfWeek = dateIndex % 5; // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri
+            const dayOfWeek = dateIndex % 5;
             
-            if (dayOfWeek === 0 && attending === 'Smith') return medStudent; // Mon OR
-            if (dayOfWeek === 1 && attending === 'Smith') return medStudent; // Tue clinic
-            if (dayOfWeek === 2 && (attending === 'Stinnett' || attending === 'Santa Maria')) return medStudent; // Wed
-            if (dayOfWeek === 3 && attending === 'Kaffenberger') return medStudent; // Thu
-            if (dayOfWeek === 4 && attending === 'Soose') return medStudent; // Fri OR
+            if (dayOfWeek === 0 && attending === 'Smith') return medStudent;
+            if (dayOfWeek === 1 && attending === 'Smith') return medStudent;
+            if (dayOfWeek === 2 && (attending === 'Stinnett' || attending === 'Santa Maria')) return medStudent;
+            if (dayOfWeek === 3 && attending === 'Kaffenberger') return medStudent;
+            if (dayOfWeek === 4 && attending === 'Soose') return medStudent;
             
             return '';
         }
@@ -449,6 +475,8 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             const attendings = ['Smith', 'Stinnett', 'Santa Maria', 'Soose', 'Whelan', 'Kaffenberger'];
             const dates = parsedData.dates;
             const tableData = [];
+
+            console.log(`Generating table for ${dates.length} days: ${dates.join(', ')}`);
 
             // Generate rows for each attending
             for (let attending of attendings) {
@@ -468,15 +496,15 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                         activity = 'OR';
                         if (dayData.location) activity += ` (${dayData.location})`;
                         count = `${dayData.orCases} cases`;
-                        resident = assignCoverage(attending, date, dayData);
-                        if (dayData.orCases > 0) student = assignMedStudent(attending, i);
+                        resident = assignCoverage(attending, date, dayData, i);
+                        student = assignMedStudent(attending, i);
                     } else if (dayData.clinicPts > 0) {
                         activity = 'CLINIC';
                         if (dayData.clinicType) activity += ` (${dayData.clinicType})`;
                         if (dayData.location) activity += ` (${dayData.location})`;
                         count = `${dayData.clinicPts} pts`;
-                        resident = assignCoverage(attending, date, dayData);
-                        if (dayData.clinicPts > 0) student = assignMedStudent(attending, i);
+                        resident = assignCoverage(attending, date, dayData, i);
+                        student = assignMedStudent(attending, i);
                     }
 
                     row1.push(activity, resident);
@@ -516,10 +544,12 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
             tableData.push(ootRow);
             tableData.push(meetingsRow);
 
+            console.log('Generated table data:', tableData);
             return tableData;
         }
 
-        function showPreview() {
+        function showPreviewTable() {
+            console.log('showPreviewTable called');
             try {
                 const tableData = generateScheduleTable();
                 const dates = parsedData.dates;
@@ -544,8 +574,16 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 // Data rows
                 tableData.forEach(row => {
                     html += '<tr>';
-                    row.forEach(cell => {
-                        html += `<td>${cell || '&nbsp;'}</td>`;
+                    row.forEach((cell, idx) => {
+                        let className = '';
+                        if (idx > 0 && idx % 2 === 1) { // Activity columns
+                            if (cell && cell.includes('CLINIC')) {
+                                className = 'clinic-cell';
+                            } else if (cell && cell.includes('OR')) {
+                                className = 'or-cell';
+                            }
+                        }
+                        html += `<td class="${className}">${cell || '&nbsp;'}</td>`;
                     });
                     html += '</tr>';
                 });
@@ -556,12 +594,18 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 showMessage('Preview generated successfully!', 'success');
             } catch (error) {
                 showMessage(`Error: ${error.message}`, 'error');
+                console.error('Preview error:', error);
                 document.getElementById('preview').innerHTML = '';
             }
         }
 
-        function generateExcel() {
+        function generateExcelFile() {
+            console.log('generateExcelFile called');
             try {
+                if (typeof XLSX === 'undefined') {
+                    throw new Error('Excel library not loaded. Please refresh the page.');
+                }
+
                 const tableData = generateScheduleTable();
                 const dates = parsedData.dates;
                 
@@ -585,6 +629,40 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 }
                 ws['!cols'] = colWidths;
 
+                // Apply cell styles
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                
+                // Style header row (pastel yellow)
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const cell_address = XLSX.utils.encode_cell({r: 0, c: C});
+                    if (!ws[cell_address]) continue;
+                    ws[cell_address].s = {
+                        fill: { fgColor: { rgb: "FFF9C4" } },
+                        font: { bold: true },
+                        alignment: { horizontal: "center", vertical: "center" }
+                    };
+                }
+
+                // Style data cells
+                for (let R = 1; R <= range.e.r; R++) {
+                    for (let C = 1; C <= range.e.c; C += 2) { // Activity columns only
+                        const cell_address = XLSX.utils.encode_cell({r: R, c: C});
+                        if (!ws[cell_address] || !ws[cell_address].v) continue;
+                        
+                        const cellValue = ws[cell_address].v.toString();
+                        
+                        if (cellValue.includes('CLINIC')) {
+                            ws[cell_address].s = {
+                                fill: { fgColor: { rgb: "C8E6C9" } }
+                            };
+                        } else if (cellValue.includes('OR')) {
+                            ws[cell_address].s = {
+                                fill: { fgColor: { rgb: "FFCDD2" } }
+                            };
+                        }
+                    }
+                }
+
                 XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
 
                 // Generate filename
@@ -596,15 +674,31 @@ Soose, Ryan J, MD    8:00 AM    841878807    Scheduled    ENT NEW    ENTMERSLEEP
                 showMessage(`Excel file "${filename}" generated successfully!`, 'success');
             } catch (error) {
                 showMessage(`Error generating Excel: ${error.message}`, 'error');
+                console.error('Excel generation error:', error);
             }
         }
 
-        function clearAll() {
+        function clearAllData() {
+            console.log('clearAllData called');
             document.getElementById('scheduleInput').value = '';
             document.getElementById('preview').innerHTML = '';
             document.getElementById('messageArea').innerHTML = '';
             parsedData = null;
+            showMessage('All data cleared', 'success');
         }
+
+        // Set up event listeners when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, setting up event listeners');
+            
+            document.getElementById('parseBtn').addEventListener('click', parseScheduleData);
+            document.getElementById('previewBtn').addEventListener('click', showPreviewTable);
+            document.getElementById('excelBtn').addEventListener('click', generateExcelFile);
+            document.getElementById('clearBtn').addEventListener('click', clearAllData);
+            
+            console.log('Event listeners set up');
+            showMessage('Ready! Paste your schedule data and click Parse.', 'success');
+        });
     </script>
 </body>
 </html>
